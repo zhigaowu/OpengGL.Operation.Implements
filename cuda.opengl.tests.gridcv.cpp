@@ -132,7 +132,7 @@ int test_gridcv_buffer(int argc, char** argv)
 		int width = SCR_WIDTH, height = SCR_HEIGHT;
 		glfwGetWindowSize(window, &width, &height);
 
-		/*double nowTime = glfwGetTime();
+		double nowTime = glfwGetTime();
 		if (lastTime + 1.0 < nowTime)
 		{
 			lastTime = nowTime;
@@ -167,14 +167,14 @@ int test_gridcv_buffer(int argc, char** argv)
 			texture_painter.EndUpdate();
 		}
 
-		texture_painter.Paint();*/
+		texture_painter.Paint();
 
 		shape_painter.Paint();
 
 		text_painter.Paint(L"09 Hello World", 20.0f, 400.0f, 0.5f, 255, 0, 0, 50.0f, 450.0f);
-		text_painter.Paint(L"My Name", 1400.0f, 400.0f, 0.5f, 255, 0, 0, 1000.0f, 200.0f);
-		text_painter.Paint(L"Up test", 1000.0f, 600.0f, 1.0f, 255, 0, 0, 1010.0f, 400.0f);
-		text_painter.Paint(L"(C) LearnOpenGL.com", 20.0f, 700.0f, 0.4f, 0, 0, 255, 380.0f, 800.0f);
+		text_painter.Paint(L"My Name", 1400.0f, 400.0f, 1.0f, 255, 0, 0, 1000.0f, 200.0f);
+		text_painter.Paint(L"Up test", 1000.0f, 600.0f, 1.5f, 255, 0, 0, 1010.0f, 400.0f);
+		text_painter.Paint(L"(C) LearnOpenGL.com", 20.0f, 700.0f, 2.0f, 0, 0, 255, 1380.0f, 800.0f);
 
 		//text_painter.Paint(L"娃哈", 400.0f, 900.0f, 1.0f, 255, 0, 0);
 		//text_painter.Paint(L"中国", 400.0f, 1000.0f, 1.0f, 0, 0, 255);

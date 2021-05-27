@@ -289,7 +289,7 @@ void OpenGLTextPainter::Parse(const std::vector<std::wstring>& texts, const char
 
 #define FONT_INDICATOR_MARGIN 10
 #define INDICATOR_TARGET_MARGIN 20
-#define FONT_ORIGINAL_WIDTH 96
+#define FONT_ORIGINAL_WIDTH 88
 
 void OpenGLTextPainter::Paint(const std::wstring& text, float x, float y, float scale, unsigned char b, unsigned char g, unsigned char r, float link_x, float link_y)
 {
@@ -352,13 +352,13 @@ void OpenGLTextPainter::Paint(const std::wstring& text, float x, float y, float 
 	if (x + INDICATOR_TARGET_MARGIN < link_x)
 	{
 		vertices[0][0] = (start_x - _half_texture_width) / _half_texture_width;
-		vertices[0][1] = (_half_texture_height - (y + FONT_INDICATOR_MARGIN)) / _half_texture_height;
+		vertices[0][1] = (_half_texture_height - (y + FONT_INDICATOR_MARGIN * scale)) / _half_texture_height;
 
-		vertices[1][0] = ((x + FONT_INDICATOR_MARGIN) - _half_texture_width) / _half_texture_width;
+		vertices[1][0] = ((x + FONT_INDICATOR_MARGIN * scale) - _half_texture_width) / _half_texture_width;
 		vertices[1][1] = vertices[0][1];
 
 		vertices[2][0] = vertices[1][0];
-		vertices[2][1] = (_half_texture_height - (y - (_font_height >> 1))) / _half_texture_height;
+		vertices[2][1] = (_half_texture_height - (y - ((_font_height >> 1) + FONT_INDICATOR_MARGIN) * scale)) / _half_texture_height;
 
 		vertices[3][0] = ((link_x) - _half_texture_width) / _half_texture_width;
 		vertices[3][1] = (_half_texture_height - (link_y)) / _half_texture_height;
@@ -387,13 +387,13 @@ void OpenGLTextPainter::Paint(const std::wstring& text, float x, float y, float 
 	else
 	{
 		vertices[0][0] = (x - _half_texture_width) / _half_texture_width;
-		vertices[0][1] = (_half_texture_height - (y + FONT_INDICATOR_MARGIN)) / _half_texture_height;
+		vertices[0][1] = (_half_texture_height - (y + FONT_INDICATOR_MARGIN * scale)) / _half_texture_height;
 
-		vertices[1][0] = ((start_x - FONT_INDICATOR_MARGIN) - _half_texture_width) / _half_texture_width;
+		vertices[1][0] = ((start_x - FONT_INDICATOR_MARGIN * scale) - _half_texture_width) / _half_texture_width;
 		vertices[1][1] = vertices[0][1];
 
 		vertices[2][0] = vertices[1][0];
-		vertices[2][1] = (_half_texture_height - (y - (_font_height >> 1))) / _half_texture_height;
+		vertices[2][1] = (_half_texture_height - (y - ((_font_height >> 1) + FONT_INDICATOR_MARGIN) * scale)) / _half_texture_height;
 
 		vertices[3][0] = ((link_x) - _half_texture_width) / _half_texture_width;
 		vertices[3][1] = (_half_texture_height - (link_y)) / _half_texture_height;

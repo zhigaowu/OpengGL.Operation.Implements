@@ -162,9 +162,11 @@ OpenGLGridCVPainter::OpenGLGridCVPainter(int rows, int cols, int width, int heig
 	glBindTexture(GL_TEXTURE_2D, 0);
 	
 	// 5. register pixel buffer for INTER_OP
+
+#ifdef USE_CUDA
 	checkCudaErrors(cudaSetDevice(device));
 	checkCudaErrors(cudaGraphicsGLRegisterBuffer(&_cuda_resource, _pixel_buffer, cudaGraphicsMapFlagsWriteDiscard));
-
+#endif
 }
 
 OpenGLGridCVPainter::~OpenGLGridCVPainter()
@@ -205,15 +207,18 @@ OpenGLGridCVPainter::~OpenGLGridCVPainter()
 
 void OpenGLGridCVPainter::BeginUpdate()
 {
+#ifdef USE_CUDA
 	checkCudaErrors(cudaGraphicsMapResources(1, &_cuda_resource, 0));
 	size_t num_bytes;
 	checkCudaErrors(cudaGraphicsResourceGetMappedPointer(&_data, &num_bytes, _cuda_resource));
+#endif
 }
 
 extern cudaError_t cuda_update_horizontal_margin(void *dst, int step, int row, int texture_width, int height, int margin, unsigned char b, unsigned char g, unsigned char r);
 extern cudaError_t cuda_update_vertical_margin(void *dst, int step, int col, int width, int texture_height, int margin, unsigned char b, unsigned char g, unsigned char r);
 void OpenGLGridCVPainter::UpdateMargin(const cv::Scalar& margin_color)
 {
+#ifdef USE_CUDA
 	if (_margin > 0)
 	{
 		for (int r = 0; r <= _rows; ++r)
@@ -226,16 +231,20 @@ void OpenGLGridCVPainter::UpdateMargin(const cv::Scalar& margin_color)
 			checkCudaErrors(cuda_update_vertical_margin(_data, _step, c, _width, _texture_height, _margin, (unsigned char)margin_color[0], (unsigned char)margin_color[1], (unsigned char)margin_color[2]));
 		}
 	}
+#endif
 }
 
 extern cudaError_t cuda_update(void *dst, int step_dst, int row, int col, int margin, void* src, int step_src, int width, int height);
 void OpenGLGridCVPainter::Update(int row, int col, const cv::cuda::GpuMat& image)
 {
+#ifdef USE_CUDA
 	checkCudaErrors(cuda_update(_data, _step, row, col, _margin, image.data, (int)(image.step), _width, _height));
+#endif
 }
 
 void OpenGLGridCVPainter::EndUpdate()
 {
+#ifdef USE_CUDA
 	checkCudaErrors(cudaGraphicsUnmapResources(1, &_cuda_resource, 0));
 
 	// Select the appropriate buffer 
@@ -247,6 +256,7 @@ void OpenGLGridCVPainter::EndUpdate()
 
 	glBindTexture(GL_TEXTURE_2D, 0);
 	glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
+#endif
 }
 
 void OpenGLGridCVPainter::Paint()
