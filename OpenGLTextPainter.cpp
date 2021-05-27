@@ -50,12 +50,12 @@ OpenGLTextPainter::OpenGLTextPainter(int texture_width, int texture_height, int 
 		"out vec4 color;                                                    \n"
 		"                                                                   \n"
 		"uniform sampler2D text;                                            \n"
-		"uniform vec3 textColor;                                            \n"
+		"uniform vec4 textColor;                                            \n"
 		"                                                                   \n"
 		"void main()                                                        \n"
 		"{                                                                  \n"
 		"	vec4 sampled = vec4(1.0, 1.0, 1.0, texture(text, TexCoords).r); \n"
-		"	color = vec4(textColor, 1.0) * sampled;                         \n"
+		"	color = textColor * sampled;                         \n"
 		"}                                                                  \n";
 
 	// 1.2. compile font shaders
@@ -96,11 +96,11 @@ OpenGLTextPainter::OpenGLTextPainter(int texture_width, int texture_height, int 
 		"#version 330 core                \n"
 		"out vec4 color;                  \n"
 		"                                 \n"
-		"uniform vec3 lineColor;          \n"
+		"uniform vec4 lineColor;          \n"
 		"                                 \n"
 		"void main()                      \n"
 		"{                                \n"
-		"	color = vec4(lineColor, 1.0); \n"
+		"	color = lineColor;            \n"
 		"}                                \n";
 
 	// 1.5. compile indicator shaders
@@ -287,7 +287,7 @@ void OpenGLTextPainter::Parse(const std::vector<std::wstring>& texts)
 	} while (false);
 }
 
-void OpenGLTextPainter::Parse(const std::wstring& text, const glm::vec2& font_position, float scale, const glm::vec3& font_color, const glm::vec2& link_position, const glm::vec3& link_color)
+void OpenGLTextPainter::Parse(const std::wstring& text, const glm::vec2& font_position, float scale, const glm::vec4& font_color, const glm::vec2& link_position, const glm::vec4& link_color)
 {
 	do
 	{
@@ -379,11 +379,11 @@ void OpenGLTextPainter::Parse(const std::wstring& text, const glm::vec2& font_po
 #define INDICATOR_TARGET_MARGIN 20
 #define FONT_ORIGINAL_WIDTH 88
 
-void OpenGLTextPainter::Paint(const std::wstring& text, const glm::vec2& font_position, float scale, const glm::vec3& font_color, const glm::vec2& link_position, const glm::vec3& link_color)
+void OpenGLTextPainter::Paint(const std::wstring& text, const glm::vec2& font_position, float scale, const glm::vec4& font_color, const glm::vec2& link_position, const glm::vec4& link_color)
 {
 	// render font
 	glUseProgram(_font_program);
-	glUniform3f(glGetUniformLocation(_font_program, "textColor"), font_color.z / 255.0f, font_color.y / 255.0f, font_color.x / 255.0f);
+	glUniform4f(glGetUniformLocation(_font_program, "textColor"), font_color.x / 255.0f, font_color.y / 255.0f, font_color.z / 255.0f, font_color.w);
 
 	glBindVertexArray(_font_vertex_array);
 
@@ -428,7 +428,7 @@ void OpenGLTextPainter::Paint(const std::wstring& text, const glm::vec2& font_po
 	{
 		// render indicator
 		glUseProgram(_indicator_program);
-		glUniform3f(glGetUniformLocation(_indicator_program, "lineColor"), link_color.z / 255.0f, link_color.y / 255.0f, link_color.x / 255.0f);
+		glUniform4f(glGetUniformLocation(_indicator_program, "lineColor"), link_color.x / 255.0f, link_color.y / 255.0f, link_color.z / 255.0f, link_color.w);
 
 		glBindVertexArray(_indicator_vertex_array);
 
@@ -515,9 +515,9 @@ void OpenGLTextPainter::Paint()
 		const std::wstring& text = font_info.text;
 		float scale = font_info.scale;
 		const glm::vec2& font_position = font_info.font_position;
-		const glm::vec3& font_color = font_info.font_color;
+		const glm::vec4& font_color = font_info.font_color;
 
-		glUniform3f(glGetUniformLocation(_font_program, "textColor"), font_color.z / 255.0f, font_color.y / 255.0f, font_color.x / 255.0f);
+		glUniform4f(glGetUniformLocation(_font_program, "textColor"), font_color.x / 255.0f, font_color.y / 255.0f, font_color.z / 255.0f, font_color.w);
 
 		float x = font_position.x;
 		for (const wchar_t c : text)
@@ -576,14 +576,14 @@ void OpenGLTextPainter::Paint()
 		float scale = font_info.scale;
 		const glm::vec2& font_position = font_info.font_position;
 		const glm::vec2& link_position = font_info.link_position;
-		const glm::vec3& link_color = font_info.link_color;
+		const glm::vec4& link_color = font_info.link_color;
 
 		if (link_position.x < 0.0f || link_position.y < 0.0f)
 		{
 			continue;
 		}
 
-		glUniform3f(glGetUniformLocation(_indicator_program, "lineColor"), link_color.z / 255.0f, link_color.y / 255.0f, link_color.x / 255.0f);
+		glUniform4f(glGetUniformLocation(_indicator_program, "lineColor"), link_color.x / 255.0f, link_color.y / 255.0f, link_color.z / 255.0f, link_color.w);
 
 		if (x + INDICATOR_TARGET_MARGIN < link_position.x)
 		{

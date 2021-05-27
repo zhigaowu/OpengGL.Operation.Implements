@@ -23,10 +23,10 @@ private:
 
 		float scale = 1.0f;
 		glm::vec2 font_position;
-		glm::vec3 font_color = { 0.0f, 0.0f, 0.0f };
+		glm::vec4 font_color{ 0.0f, 0.0f, 0.0f, 1.0f };
 
-		glm::vec2 link_position = {-1.0f, -1.0f};
-		glm::vec3 link_color = { 0.0f, 0.0f, 0.0f };
+		glm::vec2 link_position{-1.0f, -1.0f};
+		glm::vec4 link_color{ 0.0f, 0.0f, 0.0f, 1.0f };
 	};
 	typedef std::vector<TextInfo> TextInfos;
 
@@ -58,9 +58,9 @@ public:
 	~OpenGLTextPainter();
 
 	void Parse(const std::vector<std::wstring>& texts);
-	void Paint(const std::wstring& text, const glm::vec2& font_position, float scale, const glm::vec3& font_color, const glm::vec2& link_position = { -1.0f, -1.0f }, const glm::vec3& link_color = { 0.0f, 0.0f, 0.0f });
+	void Paint(const std::wstring& text, const glm::vec2& font_position, float scale, const glm::vec4& font_color, const glm::vec2& link_position = glm::vec2{ -1.0f, -1.0f }, const glm::vec4& link_color = glm::vec4{ 0.0f, 0.0f, 0.0f, 1.0f });
 
-	void Parse(const std::wstring& text, const glm::vec2& font_position, float scale, const glm::vec3& font_color, const glm::vec2& link_position = { -1.0f, -1.0f }, const glm::vec3& link_color = { 0.0f, 0.0f, 0.0f });
+	void Parse(const std::wstring& text, const glm::vec2& font_position, float scale, const glm::vec4& font_color, const glm::vec2& link_position = glm::vec2{ -1.0f, -1.0f }, const glm::vec4& link_color = glm::vec4{ 0.0f, 0.0f, 0.0f, 1.0f });
 	void Paint();
 
 private:
