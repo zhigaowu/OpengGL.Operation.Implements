@@ -2,21 +2,40 @@
 #define _OPENGL_SHAPE_PAINTER_HEADER_H_
 
 #include <glad/glad.h>
+#include <glm/glm.hpp>
+
+#include <vector>
 
 class OpenGLShapePainter
 {
 private:
-	GLuint _vertex_array, _vertex_object, _element_object;
+	struct Shape 
+	{
+		std::vector<float> points;
+		std::vector<unsigned int> indexs;
+		glm::vec4 color;
+		GLuint vertex_array = 0;
+		GLuint vertex_object = 0;
+		GLuint element_object = 0;
+	};
+	typedef std::vector<Shape> Shapes;
+
+private:
 	GLuint _program;
 	
 private:
-	int _texture_width;
-	int _texture_height;
+	int _half_texture_width;
+	int _half_texture_height;
+
+private:
+	Shapes _shapes;
 	
 public:
 	OpenGLShapePainter(int texture_width, int texture_height);
 
 	~OpenGLShapePainter();
+
+	void Parse(const std::vector<glm::vec2>& points, const glm::vec4& color);
 
 	void Paint();
 

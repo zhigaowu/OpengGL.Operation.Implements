@@ -21,30 +21,32 @@ static void checkShaderCompileResult(GLuint object, const char *const file, int 
 #define checkCompileErrors(val) checkShaderCompileResult(val, __FILE__, __LINE__)
 
 OpenGLShapePainter::OpenGLShapePainter(int texture_width, int texture_height)
-	: _vertex_array(0), _vertex_object(0), _element_object(), _program(0)
-	, _texture_width(texture_width), _texture_height(texture_height)
+	: _program(0)
+	, _half_texture_width(texture_width >> 1), _half_texture_height(texture_height >> 1)
+	, _shapes()
 {
 
 	// 1. compile shaders
 	// ------------------------------------------------------------------
 	// 1.1. prepare shader source
 	static const char* vertex_shader_src =
-		"#version 330 core                            \n"
-		"layout (location = 0) in vec3 aPos;          \n"
-		"                                             \n"
-		"void main()                                  \n"
-		"{                                            \n"
-		"	gl_Position = vec4(aPos, 1.0);            \n"
-		"}                                            \n";
+		"#version 330 core                   \n"
+		"layout (location = 0) in vec3 aPos; \n"
+		"                                    \n"
+		"void main()                         \n"
+		"{                                   \n"
+		"	gl_Position = vec4(aPos, 1.0);   \n"
+		"}                                   \n";
 
 	static const char* fragment_shader_src =
-		"#version 330 core                           \n"
-		"out vec4 FragColor;                         \n"
-		"                                            \n"
-		"void main()                                 \n"
-		"{                                           \n"
-		"	FragColor = vec4(1.0f, 0.5f, 0.2f, 0.5f);\n"
-		"}                                           \n";
+		"#version 330 core          \n"
+		"out vec4 FragColor;        \n"
+		"uniform vec4 shapeColor;   \n"
+		"                           \n"
+		"void main()                \n"
+		"{                          \n"
+		"	FragColor = shapeColor; \n"
+		"}                          \n";
 
 	// 1.2. compile shaders
 	// vertex shader
@@ -69,55 +71,25 @@ OpenGLShapePainter::OpenGLShapePainter(int texture_width, int texture_height)
 	// 1.3. delete the shaders as they're linked into our program now and no longer necessary
 	glDeleteShader(vertex_shader);
 	glDeleteShader(fragment_shader);
-
-	// 2. vertex data and element data
-	// ------------------------------------------------------------------
-	static float vertice_data[] = {
-		// positions
-		-0.5f,  0.5f, 0.0f, // top left
-		 0.5f,  0.5f, 0.0f, // top right
-		-0.5f, -0.5f, 0.0f, // bottom left
-		 0.5f, -0.5f, 0.0f, // bottom right
-	};
-	static unsigned int indice_triangle_data[] = {
-		0, 1, 2, // first triangle
-		1, 2, 3  // second triangle
-	};
-
-	// 2.1. configure vertex attributes
-	glGenVertexArrays(1, &_vertex_array);
-	glGenBuffers(1, &_vertex_object);
-	glGenBuffers(1, &_element_object);
-
-	glBindVertexArray(_vertex_array);
-
-	glBindBuffer(GL_ARRAY_BUFFER, _vertex_object);
-	glBufferData(GL_ARRAY_BUFFER, sizeof(vertice_data), vertice_data, GL_STATIC_DRAW);
-
-	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, _element_object);
-	glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indice_triangle_data), indice_triangle_data, GL_STATIC_DRAW);
-
-	// position attribute
-	glEnableVertexAttribArray(0);
-	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
-
-	glBindVertexArray(0);
 }
 
 OpenGLShapePainter::~OpenGLShapePainter()
 {
-	if (_vertex_array)
+	for (const Shape& shape : _shapes)
 	{
-		glDeleteVertexArrays(1, &_vertex_array);
-	}
+		if (shape.vertex_array)
+		{
+			glDeleteVertexArrays(1, &shape.vertex_array);
+		}
 
-	if (_vertex_object)
-	{
-		glDeleteBuffers(1, &_vertex_object);
-	}
-	if (_element_object)
-	{
-		glDeleteBuffers(1, &_element_object);
+		if (shape.vertex_object)
+		{
+			glDeleteBuffers(1, &shape.vertex_object);
+		}
+		if (shape.element_object)
+		{
+			glDeleteBuffers(1, &shape.element_object);
+		}
 	}
 
 	if (_program)
@@ -126,13 +98,70 @@ OpenGLShapePainter::~OpenGLShapePainter()
 	}
 }
 
+void OpenGLShapePainter::Parse(const std::vector<glm::vec2>& points, const glm::vec4& color)
+{
+	Shape shape;
+	shape.color = color;
+
+	shape.points.resize(points.size() * 3);
+	for (size_t p = 0; p < points.size(); ++p)
+	{
+		shape.points[p * 3 + 0] = (points[p].x - _half_texture_width) / _half_texture_width;
+		shape.points[p * 3 + 1] = (_half_texture_height - points[p].y) / _half_texture_height;
+	}
+
+	std::vector<unsigned int> seqs(points.size());
+	unsigned int s = 0, e = (unsigned int)(points.size()) - 1;
+	int index = 0;
+	do 
+	{
+		seqs[index++] = s++;
+		seqs[index++] = e--;
+	} while (s < e);
+
+	shape.indexs.resize((points.size() - 2) * 3);
+	for (size_t i = 0; i < points.size(); ++i)
+	{
+		shape.indexs[i * 3 + 0] = seqs[i + 0];
+		shape.indexs[i * 3 + 1] = seqs[i + 1];
+		shape.indexs[i * 3 + 2] = seqs[i + 2];
+	}
+
+	// vertex data and element data
+	// ------------------------------------------------------------------
+	// 2.1. configure vertex attributes
+	glGenVertexArrays(1, &shape.vertex_array);
+	glGenBuffers(1, &shape.vertex_object);
+	glGenBuffers(1, &shape.element_object);
+
+	glBindVertexArray(shape.vertex_array);
+
+	glBindBuffer(GL_ARRAY_BUFFER, shape.vertex_object);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(float) * shape.points.size(), shape.points.data(), GL_STATIC_DRAW);
+
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, shape.element_object);
+	glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(unsigned int) * shape.indexs.size(), shape.indexs.data(), GL_STATIC_DRAW);
+
+	// position attribute
+	glEnableVertexAttribArray(0);
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
+
+	glBindVertexArray(0);
+
+	_shapes.push_back(shape);
+}
+
 void OpenGLShapePainter::Paint()
 {
 	// render container
 	glUseProgram(_program);
-	glBindVertexArray(_vertex_array);
+	
+	for (const Shape& shape : _shapes)
+	{
+		glUniform4f(glGetUniformLocation(_program, "shapeColor"), shape.color.z / 255.0f, shape.color.y / 255.0f, shape.color.x / 255.0f, shape.color.w);
 
-	glDrawElements(GL_TRIANGLE_STRIP, 6, GL_UNSIGNED_INT, 0);
-
-	glBindVertexArray(0);
+		glBindVertexArray(shape.vertex_array);
+		glDrawElements(GL_TRIANGLE_STRIP, (GLsizei)shape.indexs.size(), GL_UNSIGNED_INT, 0);
+		glBindVertexArray(0);
+	}
 }

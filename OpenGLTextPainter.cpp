@@ -22,12 +22,12 @@ static void checkShaderCompileResult(GLuint object, const char *const file, int 
 
 #define checkCompileErrors(val) checkShaderCompileResult(val, __FILE__, __LINE__)
 
-OpenGLTextPainter::OpenGLTextPainter(int texture_width, int texture_height)
+OpenGLTextPainter::OpenGLTextPainter(int texture_width, int texture_height, int font_height, const char* font_name)
 	: _font_vertex_array(0), _font_vertex_object(0), _font_program(0)
 	, _indicator_vertex_array(0), _indicator_vertex_object(0), _indicator_program(0)
-	, _characters()
+	, _font_name(font_name), _characters()
 	, _half_texture_width(texture_width >> 1), _half_texture_height(texture_height >> 1)
-	, _font_height(48)
+	, _font_height(font_height)
 {
 
 	// 1. compile shaders
@@ -203,7 +203,7 @@ OpenGLTextPainter::~OpenGLTextPainter()
 	}
 }
 
-void OpenGLTextPainter::Parse(const std::vector<std::wstring>& texts, const char* font_name)
+void OpenGLTextPainter::Parse(const std::vector<std::wstring>& texts)
 {
 	do
 	{
@@ -216,7 +216,7 @@ void OpenGLTextPainter::Parse(const std::vector<std::wstring>& texts, const char
 		}
 
 		char font_file[128] = { 0 };
-		sprintf(font_file, "fonts/%s.ttf", font_name);
+		sprintf(font_file, "fonts/%s.ttf", _font_name.c_str());
 
 		FT_Face face;
 		if (FT_New_Face(ft, font_file, 0, &face))
@@ -287,25 +287,113 @@ void OpenGLTextPainter::Parse(const std::vector<std::wstring>& texts, const char
 	} while (false);
 }
 
+void OpenGLTextPainter::Parse(const std::wstring& text, const glm::vec2& font_position, float scale, const glm::vec3& font_color, const glm::vec2& link_position, const glm::vec3& link_color)
+{
+	do
+	{
+		if (text.empty())
+		{
+			break;
+		}
+
+		FT_Library ft;
+		// All functions return a value different than 0 whenever an error occurred
+		if (FT_Init_FreeType(&ft))
+		{
+			fprintf(stderr, "initialize FreeType library failed\n");
+			break;
+		}
+
+		char font_file[128] = { 0 };
+		sprintf(font_file, "fonts/%s.ttf", _font_name.c_str());
+
+		FT_Face face;
+		if (FT_New_Face(ft, font_file, 0, &face))
+		{
+			fprintf(stderr, "initialize font face: %s failed\n", font_file);
+
+			FT_Done_FreeType(ft);
+			break;
+		}
+
+		FT_Select_Charmap(face, FT_ENCODING_UNICODE);
+		// set size to load glyphs as
+		FT_Set_Pixel_Sizes(face, 0, _font_height);
+
+		// disable byte-alignment restriction
+		glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+
+		for (const wchar_t c : text)
+		{
+			if (_characters.find(c) == _characters.end())
+			{
+				// Load character glyph 
+				if (FT_Load_Char(face, c, FT_LOAD_RENDER))
+				{
+					fprintf(stderr, "load character(%c) glyph failed\n", c);
+					continue;
+				}
+
+				// generate texture
+				GLuint texture;
+				glGenTextures(1, &texture);
+				glBindTexture(GL_TEXTURE_2D, texture);
+				glTexImage2D(
+					GL_TEXTURE_2D,
+					0,
+					GL_RED,
+					face->glyph->bitmap.width,
+					face->glyph->bitmap.rows,
+					0,
+					GL_RED,
+					GL_UNSIGNED_BYTE,
+					face->glyph->bitmap.buffer
+				);
+				// set texture options
+				glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+				glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+				glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+				glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+				glBindTexture(GL_TEXTURE_2D, 0);
+
+				// now store character for later use
+				Character character = {
+					texture,
+					glm::ivec2(face->glyph->bitmap.width, face->glyph->bitmap.rows),
+					glm::ivec2(face->glyph->bitmap_left, face->glyph->bitmap_top),
+					static_cast<unsigned int>(face->glyph->advance.x)
+				};
+				_characters.insert(std::pair<wchar_t, Character>(c, character));
+			}
+		}
+
+		// destroy FreeType once we're finished
+		FT_Done_Face(face);
+		FT_Done_FreeType(ft);
+
+		_text_infos.emplace_back(TextInfo{text, scale, font_position, font_color, link_position, link_color});
+	} while (false);
+}
+
 #define FONT_INDICATOR_MARGIN 10
 #define INDICATOR_TARGET_MARGIN 20
 #define FONT_ORIGINAL_WIDTH 88
 
-void OpenGLTextPainter::Paint(const std::wstring& text, float x, float y, float scale, unsigned char b, unsigned char g, unsigned char r, float link_x, float link_y)
+void OpenGLTextPainter::Paint(const std::wstring& text, const glm::vec2& font_position, float scale, const glm::vec3& font_color, const glm::vec2& link_position, const glm::vec3& link_color)
 {
 	// render font
 	glUseProgram(_font_program);
-	glUniform3f(glGetUniformLocation(_font_program, "textColor"), (float)r / 255.0f, (float)g / 255.0f, (float)b / 255.0f);
+	glUniform3f(glGetUniformLocation(_font_program, "textColor"), font_color.z / 255.0f, font_color.y / 255.0f, font_color.x / 255.0f);
 
 	glBindVertexArray(_font_vertex_array);
 
-	float start_x = x;
+	float x = font_position.x;
 	for (const wchar_t c : text)
 	{
 		const Character& ch = _characters[c];
 
 		float xpos = x + ch.bearing.x * scale;
-		float ypos = y + (ch.size.y - ch.bearing.y) * scale;
+		float ypos = font_position.y + (ch.size.y - ch.bearing.y) * scale;
 
 		float w = ch.size.x * scale;
 		float h = ch.size.y * scale;
@@ -324,22 +412,150 @@ void OpenGLTextPainter::Paint(const std::wstring& text, float x, float y, float 
 		// update content of VBO memory
 		glBindBuffer(GL_ARRAY_BUFFER, _font_vertex_object);
 		glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(vertices), vertices); // be sure to use glBufferSubData and not glBufferData
-
 		glBindBuffer(GL_ARRAY_BUFFER, 0);
+
 		// render quad
 		glDrawArrays(GL_TRIANGLES, 0, 6);
+		glBindTexture(GL_TEXTURE_2D, 0);
+
 		// now advance cursors for next glyph (note that advance is number of 1/64 pixels)
 		x += (ch.advance >> 6) * scale; // bit shift by 6 to get value in pixels (2^6 = 64 (divide amount of 1/64th pixels by 64 to get amount of pixels))
 	}
 
 	glBindVertexArray(0);
-	glBindTexture(GL_TEXTURE_2D, 0);
 
-	// render indicator
-	glUseProgram(_indicator_program);
-	glUniform3f(glGetUniformLocation(_indicator_program, "lineColor"), (float)r / 255.0f, (float)g / 255.0f, (float)b / 255.0f);
+	if (link_position.x >= 0.0f || link_position.y >= 0.0f)
+	{
+		// render indicator
+		glUseProgram(_indicator_program);
+		glUniform3f(glGetUniformLocation(_indicator_program, "lineColor"), link_color.z / 255.0f, link_color.y / 255.0f, link_color.x / 255.0f);
 
-	glBindVertexArray(_indicator_vertex_array);
+		glBindVertexArray(_indicator_vertex_array);
+
+		// update VBO for each character
+		float vertices[4][3] = {
+			{ 0.0, 0.0f, 0.0f },
+			{ 0.0, 0.0f, 0.0f },
+			{ 0.0, 0.0f, 0.0f },
+			{ 0.0, 0.0f, 0.0f }
+		};
+
+		if (x + INDICATOR_TARGET_MARGIN < link_position.x)
+		{
+			vertices[0][0] = (font_position.x - _half_texture_width) / _half_texture_width;
+			vertices[0][1] = (_half_texture_height - (font_position.y + FONT_INDICATOR_MARGIN * scale)) / _half_texture_height;
+
+			vertices[1][0] = ((x + FONT_INDICATOR_MARGIN * scale) - _half_texture_width) / _half_texture_width;
+			vertices[1][1] = vertices[0][1];
+
+			vertices[2][0] = vertices[1][0];
+			vertices[2][1] = (_half_texture_height - (font_position.y - ((_font_height >> 1) + FONT_INDICATOR_MARGIN) * scale)) / _half_texture_height;
+
+			vertices[3][0] = ((link_position.x) - _half_texture_width) / _half_texture_width;
+			vertices[3][1] = (_half_texture_height - (link_position.y)) / _half_texture_height;
+		}
+		else if (font_position.x - INDICATOR_TARGET_MARGIN < link_position.x)
+		{
+			vertices[0][0] = ((font_position.x) - _half_texture_width) / _half_texture_width;
+			if (font_position.y < link_position.y)
+			{
+				vertices[0][1] = (_half_texture_height - (font_position.y + FONT_INDICATOR_MARGIN * scale)) / _half_texture_height;
+			}
+			else
+			{
+				vertices[0][1] = (_half_texture_height - (font_position.y - (FONT_ORIGINAL_WIDTH >> 1) * scale)) / _half_texture_height;
+			}
+
+			vertices[1][0] = (((x + font_position.x) / 2.0f) - _half_texture_width) / _half_texture_width;
+			vertices[1][1] = vertices[0][1];
+
+			vertices[2][0] = ((x)-_half_texture_width) / _half_texture_width;
+			vertices[2][1] = vertices[0][1];
+
+			vertices[3][0] = ((link_position.x) - _half_texture_width) / _half_texture_width;
+			vertices[3][1] = (_half_texture_height - (link_position.y)) / _half_texture_height;
+		}
+		else
+		{
+			vertices[0][0] = (x - _half_texture_width) / _half_texture_width;
+			vertices[0][1] = (_half_texture_height - (font_position.y + FONT_INDICATOR_MARGIN * scale)) / _half_texture_height;
+
+			vertices[1][0] = ((font_position.x - FONT_INDICATOR_MARGIN * scale) - _half_texture_width) / _half_texture_width;
+			vertices[1][1] = vertices[0][1];
+
+			vertices[2][0] = vertices[1][0];
+			vertices[2][1] = (_half_texture_height - (font_position.y - ((_font_height >> 1) + FONT_INDICATOR_MARGIN) * scale)) / _half_texture_height;
+
+			vertices[3][0] = ((link_position.x) - _half_texture_width) / _half_texture_width;
+			vertices[3][1] = (_half_texture_height - (link_position.y)) / _half_texture_height;
+		}
+
+		// update content of VBO memory
+		glBindBuffer(GL_ARRAY_BUFFER, _indicator_vertex_object);
+		glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(vertices), vertices); // be sure to use glBufferSubData and not glBufferData
+		glBindBuffer(GL_ARRAY_BUFFER, 0);
+
+		glDrawElements(GL_LINES, 6, GL_UNSIGNED_INT, 0);
+
+		glBindVertexArray(0);
+	}
+}
+
+void OpenGLTextPainter::Paint()
+{
+	// render font
+	glUseProgram(_font_program);
+	glBindVertexArray(_font_vertex_array);
+
+	std::vector<float> x_position;
+	x_position.reserve(_text_infos.size());
+
+	for (const TextInfo& font_info : _text_infos)
+	{
+		const std::wstring& text = font_info.text;
+		float scale = font_info.scale;
+		const glm::vec2& font_position = font_info.font_position;
+		const glm::vec3& font_color = font_info.font_color;
+
+		glUniform3f(glGetUniformLocation(_font_program, "textColor"), font_color.z / 255.0f, font_color.y / 255.0f, font_color.x / 255.0f);
+
+		float x = font_position.x;
+		for (const wchar_t c : text)
+		{
+			const Character& ch = _characters[c];
+
+			float xpos = x + ch.bearing.x * scale;
+			float ypos = font_position.y + (ch.size.y - ch.bearing.y) * scale;
+
+			float w = ch.size.x * scale;
+			float h = ch.size.y * scale;
+			// update VBO for each character
+			float vertices[6][4] = {
+				{ (xpos - _half_texture_width) / _half_texture_width,     (_half_texture_height - (ypos - h)) / _half_texture_height,   0.0f, 0.0f },
+				{ (xpos - _half_texture_width) / _half_texture_width,     (_half_texture_height - ypos) / _half_texture_height,         0.0f, 1.0f },
+				{ (xpos + w - _half_texture_width) / _half_texture_width, (_half_texture_height - ypos) / _half_texture_height,         1.0f, 1.0f },
+
+				{ (xpos - _half_texture_width) / _half_texture_width,     (_half_texture_height - (ypos - h)) / _half_texture_height,   0.0f, 0.0f },
+				{ (xpos + w - _half_texture_width) / _half_texture_width, (_half_texture_height - ypos) / _half_texture_height,         1.0f, 1.0f },
+				{ (xpos + w - _half_texture_width) / _half_texture_width, (_half_texture_height - (ypos - h)) / _half_texture_height,   1.0f, 0.0f }
+			};
+			// render glyph texture over quad
+			glBindTexture(GL_TEXTURE_2D, ch.texture);
+			// update content of VBO memory
+			glBindBuffer(GL_ARRAY_BUFFER, _font_vertex_object);
+			glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(vertices), vertices); // be sure to use glBufferSubData and not glBufferData
+			glBindBuffer(GL_ARRAY_BUFFER, 0);
+
+			// render quad
+			glDrawArrays(GL_TRIANGLES, 0, 6);
+			glBindTexture(GL_TEXTURE_2D, 0);
+
+			// now advance cursors for next glyph (note that advance is number of 1/64 pixels)
+			x += (ch.advance >> 6) * scale; // bit shift by 6 to get value in pixels (2^6 = 64 (divide amount of 1/64th pixels by 64 to get amount of pixels))
+		}
+		x_position.push_back(x);
+	}
+	glBindVertexArray(0);
 
 	// update VBO for each character
 	float vertices[4][3] = {
@@ -349,62 +565,83 @@ void OpenGLTextPainter::Paint(const std::wstring& text, float x, float y, float 
 		{ 0.0, 0.0f, 0.0f }
 	};
 
-	if (x + INDICATOR_TARGET_MARGIN < link_x)
+	// render indicator
+	glUseProgram(_indicator_program);
+	glBindVertexArray(_indicator_vertex_array);
+	for (size_t i = 0; i < _text_infos.size(); ++i)
 	{
-		vertices[0][0] = (start_x - _half_texture_width) / _half_texture_width;
-		vertices[0][1] = (_half_texture_height - (y + FONT_INDICATOR_MARGIN * scale)) / _half_texture_height;
+		const TextInfo& font_info = _text_infos[i];
+		float x = x_position[i];
 
-		vertices[1][0] = ((x + FONT_INDICATOR_MARGIN * scale) - _half_texture_width) / _half_texture_width;
-		vertices[1][1] = vertices[0][1];
+		float scale = font_info.scale;
+		const glm::vec2& font_position = font_info.font_position;
+		const glm::vec2& link_position = font_info.link_position;
+		const glm::vec3& link_color = font_info.link_color;
 
-		vertices[2][0] = vertices[1][0];
-		vertices[2][1] = (_half_texture_height - (y - ((_font_height >> 1) + FONT_INDICATOR_MARGIN) * scale)) / _half_texture_height;
-
-		vertices[3][0] = ((link_x) - _half_texture_width) / _half_texture_width;
-		vertices[3][1] = (_half_texture_height - (link_y)) / _half_texture_height;
-	}
-	else if (start_x - INDICATOR_TARGET_MARGIN < link_x)
-	{
-		vertices[0][0] = ((start_x) - _half_texture_width) / _half_texture_width;
-		if (y < link_y)
+		if (link_position.x < 0.0f || link_position.y < 0.0f)
 		{
-			vertices[0][1] = (_half_texture_height - (y + FONT_INDICATOR_MARGIN * scale)) / _half_texture_height;
-		} 
-		else
-		{
-			vertices[0][1] = (_half_texture_height - (y - (FONT_ORIGINAL_WIDTH >> 1) * scale)) / _half_texture_height;
+			continue;
 		}
 
-		vertices[1][0] = (((x + start_x) / 2.0f) - _half_texture_width) / _half_texture_width;
-		vertices[1][1] = vertices[0][1];
+		glUniform3f(glGetUniformLocation(_indicator_program, "lineColor"), link_color.z / 255.0f, link_color.y / 255.0f, link_color.x / 255.0f);
 
-		vertices[2][0] = ((x) - _half_texture_width) / _half_texture_width;
-		vertices[2][1] = vertices[0][1];
+		if (x + INDICATOR_TARGET_MARGIN < link_position.x)
+		{
+			vertices[0][0] = (font_position.x - _half_texture_width) / _half_texture_width;
+			vertices[0][1] = (_half_texture_height - (font_position.y + FONT_INDICATOR_MARGIN * scale)) / _half_texture_height;
 
-		vertices[3][0] = ((link_x) - _half_texture_width) / _half_texture_width;
-		vertices[3][1] = (_half_texture_height - (link_y)) / _half_texture_height;
+			vertices[1][0] = ((x + FONT_INDICATOR_MARGIN * scale) - _half_texture_width) / _half_texture_width;
+			vertices[1][1] = vertices[0][1];
+
+			vertices[2][0] = vertices[1][0];
+			vertices[2][1] = (_half_texture_height - (font_position.y - ((_font_height >> 1) + FONT_INDICATOR_MARGIN) * scale)) / _half_texture_height;
+
+			vertices[3][0] = ((link_position.x) - _half_texture_width) / _half_texture_width;
+			vertices[3][1] = (_half_texture_height - (link_position.y)) / _half_texture_height;
+		}
+		else if (font_position.x - INDICATOR_TARGET_MARGIN < link_position.x)
+		{
+			vertices[0][0] = ((font_position.x) - _half_texture_width) / _half_texture_width;
+			if (font_position.y < link_position.y)
+			{
+				vertices[0][1] = (_half_texture_height - (font_position.y + FONT_INDICATOR_MARGIN * scale)) / _half_texture_height;
+			}
+			else
+			{
+				vertices[0][1] = (_half_texture_height - (font_position.y - (FONT_ORIGINAL_WIDTH >> 1) * scale)) / _half_texture_height;
+			}
+
+			vertices[1][0] = (((x + font_position.x) / 2.0f) - _half_texture_width) / _half_texture_width;
+			vertices[1][1] = vertices[0][1];
+
+			vertices[2][0] = ((x)-_half_texture_width) / _half_texture_width;
+			vertices[2][1] = vertices[0][1];
+
+			vertices[3][0] = ((link_position.x) - _half_texture_width) / _half_texture_width;
+			vertices[3][1] = (_half_texture_height - (link_position.y)) / _half_texture_height;
+		}
+		else
+		{
+			vertices[0][0] = (x - _half_texture_width) / _half_texture_width;
+			vertices[0][1] = (_half_texture_height - (font_position.y + FONT_INDICATOR_MARGIN * scale)) / _half_texture_height;
+
+			vertices[1][0] = ((font_position.x - FONT_INDICATOR_MARGIN * scale) - _half_texture_width) / _half_texture_width;
+			vertices[1][1] = vertices[0][1];
+
+			vertices[2][0] = vertices[1][0];
+			vertices[2][1] = (_half_texture_height - (font_position.y - ((_font_height >> 1) + FONT_INDICATOR_MARGIN) * scale)) / _half_texture_height;
+
+			vertices[3][0] = ((link_position.x) - _half_texture_width) / _half_texture_width;
+			vertices[3][1] = (_half_texture_height - (link_position.y)) / _half_texture_height;
+		}
+
+		// update content of VBO memory
+		glBindBuffer(GL_ARRAY_BUFFER, _indicator_vertex_object);
+		glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(vertices), vertices); // be sure to use glBufferSubData and not glBufferData
+		glBindBuffer(GL_ARRAY_BUFFER, 0);
+
+		glDrawElements(GL_LINES, 6, GL_UNSIGNED_INT, 0);
 	}
-	else
-	{
-		vertices[0][0] = (x - _half_texture_width) / _half_texture_width;
-		vertices[0][1] = (_half_texture_height - (y + FONT_INDICATOR_MARGIN * scale)) / _half_texture_height;
-
-		vertices[1][0] = ((start_x - FONT_INDICATOR_MARGIN * scale) - _half_texture_width) / _half_texture_width;
-		vertices[1][1] = vertices[0][1];
-
-		vertices[2][0] = vertices[1][0];
-		vertices[2][1] = (_half_texture_height - (y - ((_font_height >> 1) + FONT_INDICATOR_MARGIN) * scale)) / _half_texture_height;
-
-		vertices[3][0] = ((link_x) - _half_texture_width) / _half_texture_width;
-		vertices[3][1] = (_half_texture_height - (link_y)) / _half_texture_height;
-	}
-
-	// update content of VBO memory
-	glBindBuffer(GL_ARRAY_BUFFER, _indicator_vertex_object);
-	glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(vertices), vertices); // be sure to use glBufferSubData and not glBufferData
-	glBindBuffer(GL_ARRAY_BUFFER, 0);
-
-	glDrawElements(GL_LINES, 6, GL_UNSIGNED_INT, 0);
 
 	glBindVertexArray(0);
 }

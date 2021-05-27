@@ -116,9 +116,22 @@ int test_gridcv_buffer(int argc, char** argv)
 
 	OpenGLShapePainter shape_painter(texture_painter.TextureWidth(), texture_painter.TextureHeight());
 
+	std::vector<glm::vec2> points{
+		{ 500.0f, 400.0f}, { 700.0f, 250.0f }, { 900.0f, 400.0f },
+		{ 900.0f, 800.0f }, { 750.0f, 900.0f }, { 600.0f, 800.0f }
+	};
+	std::reverse(points.begin(), points.end());
+	shape_painter.Parse(points, {0.0f, 255.0f, 0.0f, 0.1f});
+
 	OpenGLTextPainter text_painter(texture_painter.TextureWidth(), texture_painter.TextureHeight());
-	text_painter.Parse(std::vector<std::wstring>{L"09Hello World", L"(C) LearnOpenGL.com", L"My Name", L"Up test"});
-	text_painter.Parse(std::vector<std::wstring>{L"娃哈", L"中国"});
+
+	text_painter.Parse(L"09 Hello World", glm::vec2{ 20.0f, 400.0f }, 0.5f, glm::vec3{ 255, 0, 0 }, glm::vec2{ 50.0f, 450.0f }, glm::vec3{ 0, 255, 0 });
+	text_painter.Parse(L"My Name", glm::vec2{ 1400.0f, 400.0f }, 1.0f, glm::vec3{ 255, 0, 0 }, glm::vec2{ 1000.0f, 200.0f }, glm::vec3{ 0, 0, 255 });
+	text_painter.Parse(L"Up test", glm::vec2{ 1000.0f, 600.0f }, 1.5f, glm::vec3{ 255, 0, 0 }, glm::vec2{ 1010.0f, 400.0f }, glm::vec3{ 255, 0, 0 });
+	text_painter.Parse(L"(C) LearnOpenGL.com", glm::vec2{ 20.0f, 700.0f }, 2.0f, glm::vec3{ 0, 0, 255 }, glm::vec2{ 1380.0f, 800.0f }, glm::vec3{ 0, 255, 0 });
+
+	//text_painter.Parse(std::vector<std::wstring>{L"09Hello World", L"(C) LearnOpenGL.com", L"My Name", L"Up test"});
+	//text_painter.Parse(std::vector<std::wstring>{L"娃哈", L"中国"});
 	// render loop
 	// -----------
 	int b = 0, g = 125, r = 255;
@@ -171,10 +184,12 @@ int test_gridcv_buffer(int argc, char** argv)
 
 		shape_painter.Paint();
 
-		text_painter.Paint(L"09 Hello World", 20.0f, 400.0f, 0.5f, 255, 0, 0, 50.0f, 450.0f);
-		text_painter.Paint(L"My Name", 1400.0f, 400.0f, 1.0f, 255, 0, 0, 1000.0f, 200.0f);
-		text_painter.Paint(L"Up test", 1000.0f, 600.0f, 1.5f, 255, 0, 0, 1010.0f, 400.0f);
-		text_painter.Paint(L"(C) LearnOpenGL.com", 20.0f, 700.0f, 2.0f, 0, 0, 255, 1380.0f, 800.0f);
+		text_painter.Paint();
+
+		//text_painter.Paint(L"09 Hello World", glm::vec2{ 20.0f, 400.0f }, 0.5f, glm::vec3{ 255, 0, 0 }, glm::vec2{ 50.0f, 450.0f }, glm::vec3{ 0, 255, 0 });
+		//text_painter.Paint(L"My Name", glm::vec2{ 1400.0f, 400.0f }, 1.0f, glm::vec3{ 255, 0, 0 }, glm::vec2{ 1000.0f, 200.0f }, glm::vec3{ 0, 255, 0 });
+		//text_painter.Paint(L"Up test", glm::vec2{ 1000.0f, 600.0f }, 1.5f, glm::vec3{ 255, 0, 0 }, glm::vec2{ 1010.0f, 400.0f }, glm::vec3{ 0, 255, 0 });
+		//text_painter.Paint(L"(C) LearnOpenGL.com", glm::vec2{ 20.0f, 700.0f }, 2.0f, glm::vec3{ 0, 0, 255 }, glm::vec2{ 1380.0f, 800.0f }, glm::vec3{ 0, 255, 0 });
 
 		//text_painter.Paint(L"娃哈", 400.0f, 900.0f, 1.0f, 255, 0, 0);
 		//text_painter.Paint(L"中国", 400.0f, 1000.0f, 1.0f, 0, 0, 255);
