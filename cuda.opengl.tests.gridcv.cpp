@@ -6,7 +6,10 @@
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 
-#include "OpengGLGridCVPainter.h"
+#include "OpenGLGridCVPainter.h"
+
+#include "OpenGLShapePainter.h"
+#include "OpenGLTextPainter.h"
 
 // includes, cuda
 #include <cuda_runtime.h>
@@ -46,8 +49,8 @@ static void framebuffer_size_callback(GLFWwindow* window, int width, int height)
 }
 
 // settings
-const unsigned int SCR_WIDTH = 1280;
-const unsigned int SCR_HEIGHT = 720;
+const unsigned int SCR_WIDTH = 1920;
+const unsigned int SCR_HEIGHT = 1080;
 
 const int Width = 1920;
 const int Height = 1080;
@@ -67,7 +70,9 @@ int test_gridcv_buffer(int argc, char** argv)
 
 	// glfw window creation
 	// --------------------
-	GLFWwindow* window = glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, "LearnOpenGL", NULL, NULL);
+	bool isFullScreen = false;
+	GLFWmonitor* pMonitor = isFullScreen ? glfwGetPrimaryMonitor() : NULL;
+	GLFWwindow* window = glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, "LearnOpenGL", pMonitor, NULL);
 	if (window == NULL)
 	{
 		std::cout << "Failed to create GLFW window" << std::endl;
@@ -102,9 +107,18 @@ int test_gridcv_buffer(int argc, char** argv)
 		return -1;
 	}
 
-	int rows = 3, cols = 3;
-	OpengGLGridCVPainter painter(rows, cols, Width, Height, 8);
+	//glEnable(GL_CULL_FACE);
+	glEnable(GL_BLEND);
+	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
+	int rows = 1, cols = 1;
+	OpenGLGridCVPainter texture_painter(rows, cols, Width, Height, 0);
+
+	OpenGLShapePainter shape_painter(texture_painter.TextureWidth(), texture_painter.TextureHeight());
+
+	OpenGLTextPainter text_painter(texture_painter.TextureWidth(), texture_painter.TextureHeight());
+	text_painter.Parse(std::vector<std::wstring>{L"09Hello World", L"(C) LearnOpenGL.com", L"My Name", L"Up test"});
+	text_painter.Parse(std::vector<std::wstring>{L"娃哈", L"中国"});
 	// render loop
 	// -----------
 	int b = 0, g = 125, r = 255;
@@ -118,21 +132,21 @@ int test_gridcv_buffer(int argc, char** argv)
 		int width = SCR_WIDTH, height = SCR_HEIGHT;
 		glfwGetWindowSize(window, &width, &height);
 
-		double nowTime = glfwGetTime();
-		//if (lastTime + 1.0 < nowTime)
+		/*double nowTime = glfwGetTime();
+		if (lastTime + 1.0 < nowTime)
 		{
 			lastTime = nowTime;
 
-			painter.BeginUpdate();
+			texture_painter.BeginUpdate();
 			for (int r = 0; r < rows; ++r)
 			{
 				for (int c = 0; c < cols; ++c)
 				{
-					painter.Update(r, c, images[r * cols + c]);
+					texture_painter.Update(r, c, images[r * cols + c]);
 				}
 			}
 
-			painter.UpdateMargin(cv::Scalar(b, g, r));
+			texture_painter.UpdateMargin(cv::Scalar(b, g, r));
 
 			b += 5;
 			if (b > 255)
@@ -150,10 +164,20 @@ int test_gridcv_buffer(int argc, char** argv)
 				r = 0;
 			}
 
-			painter.EndUpdate();
+			texture_painter.EndUpdate();
 		}
 
-		painter.Paint();
+		texture_painter.Paint();*/
+
+		shape_painter.Paint();
+
+		text_painter.Paint(L"09 Hello World", 20.0f, 400.0f, 0.5f, 255, 0, 0, 50.0f, 450.0f);
+		text_painter.Paint(L"My Name", 1400.0f, 400.0f, 0.5f, 255, 0, 0, 1000.0f, 200.0f);
+		text_painter.Paint(L"Up test", 1000.0f, 600.0f, 1.0f, 255, 0, 0, 1010.0f, 400.0f);
+		text_painter.Paint(L"(C) LearnOpenGL.com", 20.0f, 700.0f, 0.4f, 0, 0, 255, 380.0f, 800.0f);
+
+		//text_painter.Paint(L"娃哈", 400.0f, 900.0f, 1.0f, 255, 0, 0);
+		//text_painter.Paint(L"中国", 400.0f, 1000.0f, 1.0f, 0, 0, 255);
 
 		// glfw: swap buffers and poll IO events (keys pressed/released, mouse moved etc.)
 		// -------------------------------------------------------------------------------
