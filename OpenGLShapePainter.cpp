@@ -98,16 +98,22 @@ OpenGLShapePainter::~OpenGLShapePainter()
 	}
 }
 
+void OpenGLShapePainter::Reset(int texture_width, int texture_height)
+{
+	_half_texture_width = (texture_width >> 1);
+	_half_texture_height = (texture_height >> 1);
+}
+
 void OpenGLShapePainter::Parse(const std::vector<glm::vec2>& points, const glm::vec4& color)
 {
 	Shape shape;
 	shape.color = color;
-
-	shape.points.resize(points.size() * 3);
+    
+    std::vector<float> glpoints(points.size() * 3);
 	for (size_t p = 0; p < points.size(); ++p)
 	{
-		shape.points[p * 3 + 0] = (points[p].x - _half_texture_width) / _half_texture_width;
-		shape.points[p * 3 + 1] = (_half_texture_height - points[p].y) / _half_texture_height;
+        glpoints[p * 3 + 0] = (points[p].x - _half_texture_width) / _half_texture_width;
+        glpoints[p * 3 + 1] = (_half_texture_height - points[p].y) / _half_texture_height;
 	}
 
 	std::vector<unsigned int> seqs(points.size());
@@ -119,12 +125,18 @@ void OpenGLShapePainter::Parse(const std::vector<glm::vec2>& points, const glm::
 		seqs[index++] = e--;
 	} while (s < e);
 
-	shape.indexs.resize((points.size() - 2) * 3);
-	for (size_t i = 0; i < points.size(); ++i)
+	if (s == e)
 	{
-		shape.indexs[i * 3 + 0] = seqs[i + 0];
-		shape.indexs[i * 3 + 1] = seqs[i + 1];
-		shape.indexs[i * 3 + 2] = seqs[i + 2];
+		seqs[points.size() - 1] = s;
+	}
+
+    shape.indexs = (int)(points.size() - 2) * 3;
+    std::vector<unsigned int> indexs(shape.indexs);
+	for (size_t i = 0; i < points.size() - 2; ++i)
+	{
+		indexs[i * 3 + 0] = seqs[i + 0];
+		indexs[i * 3 + 1] = seqs[i + 1];
+		indexs[i * 3 + 2] = seqs[i + 2];
 	}
 
 	// vertex data and element data
@@ -137,10 +149,10 @@ void OpenGLShapePainter::Parse(const std::vector<glm::vec2>& points, const glm::
 	glBindVertexArray(shape.vertex_array);
 
 	glBindBuffer(GL_ARRAY_BUFFER, shape.vertex_object);
-	glBufferData(GL_ARRAY_BUFFER, sizeof(float) * shape.points.size(), shape.points.data(), GL_STATIC_DRAW);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(float) * glpoints.size(), glpoints.data(), GL_STATIC_DRAW);
 
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, shape.element_object);
-	glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(unsigned int) * shape.indexs.size(), shape.indexs.data(), GL_STATIC_DRAW);
+	glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(unsigned int) * indexs.size(), indexs.data(), GL_STATIC_DRAW);
 
 	// position attribute
 	glEnableVertexAttribArray(0);
@@ -161,7 +173,7 @@ void OpenGLShapePainter::Paint()
 		glUniform4f(glGetUniformLocation(_program, "shapeColor"), shape.color.z / 255.0f, shape.color.y / 255.0f, shape.color.x / 255.0f, shape.color.w);
 
 		glBindVertexArray(shape.vertex_array);
-		glDrawElements(GL_TRIANGLE_STRIP, (GLsizei)shape.indexs.size(), GL_UNSIGNED_INT, 0);
+		glDrawElements(GL_TRIANGLE_STRIP, shape.indexs, GL_UNSIGNED_INT, 0);
 		glBindVertexArray(0);
 	}
 }

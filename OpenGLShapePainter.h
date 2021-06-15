@@ -11,8 +11,7 @@ class OpenGLShapePainter
 private:
 	struct Shape 
 	{
-		std::vector<float> points;
-		std::vector<unsigned int> indexs;
+        int indexs;
 		glm::vec4 color;
 		GLuint vertex_array = 0;
 		GLuint vertex_object = 0;
@@ -34,6 +33,8 @@ public:
 	OpenGLShapePainter(int texture_width, int texture_height);
 
 	~OpenGLShapePainter();
+
+	void Reset(int texture_width, int texture_height);
 
 	void Parse(const std::vector<glm::vec2>& points, const glm::vec4& color);
 

@@ -55,6 +55,17 @@ const unsigned int SCR_HEIGHT = 1080;
 const int Width = 1920;
 const int Height = 1080;
 
+static float link_x = 0.0f;
+static float link_y = 0.0f;
+static void mousePosWrapper(GLFWwindow* window, double x, double y)
+{
+	int width = 0, height = 0;
+	glfwGetWindowSize(window, &width, &height);
+
+	link_x = SCR_WIDTH * x / width;
+	link_y = SCR_HEIGHT * y / height;
+}
+
 int test_gridcv_buffer(int argc, char** argv)
 {
 	// glfw: initialize and configure
@@ -81,6 +92,7 @@ int test_gridcv_buffer(int argc, char** argv)
 	}
 	glfwMakeContextCurrent(window);
 	glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
+	glfwSetCursorPosCallback(window, mousePosWrapper);
 
 	std::vector<cv::cuda::GpuMat> images;
 	// read image(BGR)
@@ -111,33 +123,37 @@ int test_gridcv_buffer(int argc, char** argv)
 	glEnable(GL_BLEND);
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
+	glEnable(GL_TEXTURE_2D);
+	glActiveTexture(GL_TEXTURE0);
+
 	int rows = 1, cols = 1;
 	OpenGLGridCVPainter texture_painter(rows, cols, Width, Height, 0);
 
 	OpenGLShapePainter shape_painter(texture_painter.TextureWidth(), texture_painter.TextureHeight());
 
-	std::vector<glm::vec2> points{
-		{ 500.0f, 400.0f}, { 600.0f, 450.0f }, { 700.0f, 550.0f }, { 800.0f, 430.0f }, { 900.0f, 400.0f },
-		{ 900.0f, 800.0f }, { 750.0f, 900.0f }, { 600.0f, 800.0f }
-	};
-	std::reverse(points.begin(), points.end());
-	shape_painter.Parse(points, {0.0f, 255.0f, 0.0f, 0.1f});
-
 	OpenGLTextPainter text_painter(texture_painter.TextureWidth(), texture_painter.TextureHeight());
 
-	text_painter.Parse(L"09 Hello World", glm::vec2{ 20.0f, 400.0f },      0.5f, glm::vec4{ 0, 0, 255, 1.0f }, glm::vec2{ 50.0f, 450.0f },   glm::vec4{ 0, 255, 0, 0.2f });
+	std::vector<glm::vec2> points{
+		{ 500.0f, 400.0f}, { 600.0f, 450.0f }, { 700.0f, 550.0f }, { 800.0f, 330.0f }, { 900.0f, 400.0f },
+		{ 900.0f, 800.0f }, { 750.0f, 700.0f }, { 600.0f, 900.0f }, { 500.0f, 700.0f }
+	};
+	std::reverse(points.begin(), points.end());
+	shape_painter.Parse(points, {200.0f, 255.0f, 0.0f, 0.5f});
+
+	text_painter.Parse(L"09 Hello World", glm::vec2{ 20.0f, 400.0f },      0.5f, glm::vec4{ 0, 0, 255, 1.0f }, glm::vec2{ 50.0f  , 450.0f }, glm::vec4{ 0, 255, 0, 0.2f });
 	text_painter.Parse(L"My Name", glm::vec2{ 1400.0f, 400.0f },           1.0f, glm::vec4{ 255, 0, 0, 1.0f }, glm::vec2{ 1000.0f, 200.0f }, glm::vec4{ 0, 0, 255, 0.4f });
 	text_painter.Parse(L"Up test", glm::vec2{ 1000.0f, 600.0f },           1.5f, glm::vec4{ 0, 255, 0, 1.0f }, glm::vec2{ 1010.0f, 400.0f }, glm::vec4{ 255, 0, 0 , 0.6f });
 	text_painter.Parse(L"(C) LearnOpenGL.com", glm::vec2{ 20.0f, 700.0f }, 2.0f, glm::vec4{ 0, 0, 255, 0.8f }, glm::vec2{ 1380.0f, 800.0f }, glm::vec4{ 0, 255, 0, 0.8f });
 
-	//text_painter.Parse(std::vector<std::wstring>{L"09Hello World", L"(C) LearnOpenGL.com", L"My Name", L"Up test"});
-	//text_painter.Parse(std::vector<std::wstring>{L"娃哈", L"中国"});
+	//text_painter.Parse(std::vector<std::wstring>{L"(C) LearnOpenGL.com"});
 	// render loop
 	// -----------
 	int b = 0, g = 125, r = 255;
 	double lastTime = glfwGetTime() - 2.0;
 	while (!glfwWindowShouldClose(window))
 	{
+		std::this_thread::sleep_for(std::chrono::microseconds(500));
+
 		// input
 		// -----
 		processInput(window);
@@ -146,7 +162,7 @@ int test_gridcv_buffer(int argc, char** argv)
 		glfwGetWindowSize(window, &width, &height);
 
 		double nowTime = glfwGetTime();
-		if (lastTime + 1.0 < nowTime)
+		//if (lastTime + 1.0 < nowTime)
 		{
 			lastTime = nowTime;
 
@@ -159,7 +175,7 @@ int test_gridcv_buffer(int argc, char** argv)
 				}
 			}
 
-			texture_painter.UpdateMargin(cv::Scalar(b, g, r));
+			//texture_painter.UpdateMargin(cv::Scalar(b, g, r));
 
 			b += 5;
 			if (b > 255)
@@ -186,13 +202,7 @@ int test_gridcv_buffer(int argc, char** argv)
 
 		text_painter.Paint();
 
-		//text_painter.Paint(L"09 Hello World", glm::vec2{ 20.0f, 400.0f }, 0.5f, glm::vec3{ 255, 0, 0 }, glm::vec2{ 50.0f, 450.0f }, glm::vec3{ 0, 255, 0 });
-		//text_painter.Paint(L"My Name", glm::vec2{ 1400.0f, 400.0f }, 1.0f, glm::vec3{ 255, 0, 0 }, glm::vec2{ 1000.0f, 200.0f }, glm::vec3{ 0, 255, 0 });
-		//text_painter.Paint(L"Up test", glm::vec2{ 1000.0f, 600.0f }, 1.5f, glm::vec3{ 255, 0, 0 }, glm::vec2{ 1010.0f, 400.0f }, glm::vec3{ 0, 255, 0 });
-		//text_painter.Paint(L"(C) LearnOpenGL.com", glm::vec2{ 20.0f, 700.0f }, 2.0f, glm::vec3{ 0, 0, 255 }, glm::vec2{ 1380.0f, 800.0f }, glm::vec3{ 0, 255, 0 });
-
-		//text_painter.Paint(L"娃哈", 400.0f, 900.0f, 1.0f, 255, 0, 0);
-		//text_painter.Paint(L"中国", 400.0f, 1000.0f, 1.0f, 0, 0, 255);
+		//text_painter.Paint(L"(C) LearnOpenGL.com", glm::vec2{ link_x, link_y }, 1.0f, glm::vec4{ 255, 0, 255, 1.0f }, glm::vec2{ 900.0f, 540.0f }, glm::vec4{ 0, 255, 0, 1.0f });
 
 		// glfw: swap buffers and poll IO events (keys pressed/released, mouse moved etc.)
 		// -------------------------------------------------------------------------------
